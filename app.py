@@ -31,29 +31,31 @@ NODE_04_WARDROBE_PROMPT = """Generate a simple, maximum of 35 word description o
 
 # --- HELPER FUNCTIONS ---
 def analyze_image(client, pil_image, prompt):
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[pil_image, prompt]
-        )
-        return response.text.strip()
-    except Exception as e:
-        return ""
+    response = client.models.generate_content(
+        model='gemini-2.0-flash',
+        contents=[pil_image, prompt]
+    )
+    return response.text.strip()
 
 def run_workflow(images, key):
     client = genai.Client(api_key=key)
     primary_image = images[0]
 
     with st.status("🕵️ Analyzing your photos...", expanded=True) as status:
-        st.write("Extracting facial features...")
-        face_desc = analyze_image(client, primary_image, NODE_03_ANALYSIS_PROMPT)
-        st.write(f"Found: *{face_desc[:40]}...*")
+        try:
+            st.write("Extracting facial features...")
+            face_desc = analyze_image(client, primary_image, NODE_03_ANALYSIS_PROMPT)
+            st.write(f"Found: *{face_desc[:60]}...*")
 
-        st.write("Extracting style & wardrobe...")
-        wardrobe_desc = analyze_image(client, primary_image, NODE_04_WARDROBE_PROMPT)
-        st.write(f"Found: *{wardrobe_desc[:40]}...*")
+            st.write("Extracting style & wardrobe...")
+            wardrobe_desc = analyze_image(client, primary_image, NODE_04_WARDROBE_PROMPT)
+            st.write(f"Found: *{wardrobe_desc[:60]}...*")
 
-        status.update(label="Analysis Complete", state="complete", expanded=False)
+            status.update(label="Analysis Complete", state="complete", expanded=False)
+        except Exception as e:
+            status.update(label="Analysis Failed", state="error", expanded=True)
+            st.error(f"Analysis error: {e}")
+            return None
 
     final_prompt = f"""
     {NODE_01_HEADER}
