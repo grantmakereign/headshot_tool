@@ -32,7 +32,7 @@ NODE_04_WARDROBE_PROMPT = """Generate a simple, maximum of 35 word description o
 # --- HELPER FUNCTIONS ---
 def analyze_image(client, pil_image, prompt):
     response = client.models.generate_content(
-        model='gemini-2.0-flash',
+        model='gemini-2.5-flash',
         contents=[pil_image, prompt]
     )
     return response.text.strip()
