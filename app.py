@@ -1,9 +1,11 @@
+import os
+import base64
+import io
 import streamlit as st
 import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
 from PIL import Image
-import io
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Pro Headshot Generator", page_icon="📸", layout="centered")
@@ -13,7 +15,6 @@ st.markdown("""
 <style>
     .block-container { padding: 1.5rem 1rem; max-width: 480px; }
     .stButton > button { width: 100%; height: 3.2rem; font-size: 1.1rem; border-radius: 12px; }
-    .stFileUploader [data-testid="stFileUploaderDropzone"] { border-radius: 12px; min-height: 110px; }
     h1 { font-size: 1.6rem !important; }
     .step-label { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; color: #aaa; }
     [data-testid="stSidebar"] { display: none; }
@@ -22,26 +23,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- HIGH-RES CAMERA PATCH ---
-# Injects capture="user" onto every file input so mobile browsers open the
-# native camera app at full sensor resolution instead of the WebRTC stream.
-components.html("""
-<script>
-(function() {
-    function patchInputs() {
-        var inputs = window.parent.document.querySelectorAll('input[type="file"]');
-        inputs.forEach(function(el) {
-            el.setAttribute('capture', 'user');
-            el.setAttribute('accept', 'image/*');
-        });
-    }
-    patchInputs();
-    new MutationObserver(patchInputs).observe(
-        window.parent.document.body, { childList: true, subtree: true }
-    );
-})();
-</script>
-""", height=0)
+# --- CAMERA COMPONENT ---
+# Custom component: capture="user" is baked into the HTML — no JS injection,
+# no WebRTC stream. Mobile browsers open the native camera at full resolution.
+_COMPONENT_DIR = os.path.join(os.path.dirname(__file__), "camera_component")
+_camera_capture = components.declare_component("camera_capture", path=_COMPONENT_DIR)
+
+def camera_input(key):
+    data_url = _camera_capture(key=key, default=None)
+    if data_url:
+        _, encoded = data_url.split(",", 1)
+        return Image.open(io.BytesIO(base64.b64decode(encoded)))
+    return None
 
 # --- STATIC PROMPTS ---
 NODE_01_HEADER = "Photorealistic, high-resolution, vertical, editorial head-and-chest portrait. Maintain accurate and realistic skin texture."
@@ -128,38 +121,35 @@ def run_workflow(images, key):
 st.title("📸 Headshot Builder")
 st.caption("Take 3 selfies to generate your editorial headshot.")
 
-# Check for API key
 if "GOOGLE_API_KEY" not in st.secrets:
     st.error("No API key configured. Please add GOOGLE_API_KEY to your Streamlit secrets.")
     st.stop()
 
 api_key = st.secrets["GOOGLE_API_KEY"]
 
-# Sequential selfie capture
+# Sequential selfie capture using native high-res camera component
 st.markdown('<div class="step-label">📷 Selfie 1 of 3</div>', unsafe_allow_html=True)
-photo1 = st.file_uploader("Take selfie 1", type=["jpg", "jpeg", "png", "webp"], key="photo1", label_visibility="collapsed")
+photo1 = camera_input(key="photo1")
 
 photo2 = None
 photo3 = None
 
 if photo1:
     st.markdown('<div class="step-label">📷 Selfie 2 of 3</div>', unsafe_allow_html=True)
-    photo2 = st.file_uploader("Take selfie 2", type=["jpg", "jpeg", "png", "webp"], key="photo2", label_visibility="collapsed")
+    photo2 = camera_input(key="photo2")
 
 if photo2:
     st.markdown('<div class="step-label">📷 Selfie 3 of 3</div>', unsafe_allow_html=True)
-    photo3 = st.file_uploader("Take selfie 3", type=["jpg", "jpeg", "png", "webp"], key="photo3", label_visibility="collapsed")
+    photo3 = camera_input(key="photo3")
 
 if photo1 and photo2 and photo3:
-    loaded_images = [Image.open(p) for p in [photo1, photo2, photo3]]
-
     cols = st.columns(3)
-    for i, img in enumerate(loaded_images):
+    for i, img in enumerate([photo1, photo2, photo3]):
         cols[i].image(img, use_container_width=True)
 
     st.write("")
     if st.button("✨ Generate Headshot", type="primary"):
-        result_image = run_workflow(loaded_images, api_key)
+        result_image = run_workflow([photo1, photo2, photo3], api_key)
         if result_image:
             st.success("Generation Successful!")
             st.image(result_image, caption="Your Professional Headshot", use_container_width=True)

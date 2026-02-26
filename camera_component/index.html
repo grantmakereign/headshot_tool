@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { padding: 4px; background: transparent; font-family: sans-serif; }
+        .cam-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 22px 16px;
+            background: #f0f2f6;
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #444;
+        }
+        .cam-btn:active { background: #e0e4ec; }
+        input[type="file"] { display: none; }
+        .preview {
+            width: 100%;
+            border-radius: 10px;
+            margin-top: 8px;
+            display: none;
+        }
+        .retake {
+            margin-top: 8px;
+            width: 100%;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <label class="cam-btn" id="btn" for="cam">
+        📷 <span id="btn-text">Tap to take photo</span>
+    </label>
+    <input type="file" id="cam" accept="image/*" capture="user">
+    <img id="preview" class="preview">
+    <button class="retake" id="retake" onclick="retake()">↩ Retake</button>
+
+    <script>
+        function send(type, data) {
+            window.parent.postMessage(
+                Object.assign({ isStreamlitMessage: true, type: type }, data),
+                "*"
+            );
+        }
+
+        function setHeight() {
+            send("streamlit:setFrameHeight", { height: document.body.scrollHeight + 8 });
+        }
+
+        function retake() {
+            document.getElementById('preview').style.display = 'none';
+            document.getElementById('retake').style.display = 'none';
+            document.getElementById('btn').style.display = 'flex';
+            document.getElementById('cam').value = '';
+            send("streamlit:setComponentValue", { value: null });
+            setHeight();
+        }
+
+        document.getElementById('cam').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                var dataUrl = ev.target.result;
+                var preview = document.getElementById('preview');
+                preview.src = dataUrl;
+                preview.style.display = 'block';
+                document.getElementById('retake').style.display = 'block';
+                document.getElementById('btn').style.display = 'none';
+                setHeight();
+                send("streamlit:setComponentValue", { value: dataUrl });
+            };
+            reader.readAsDataURL(file);
+        });
+
+        window.addEventListener("message", function(e) {
+            if (e.data.type === "streamlit:render") setHeight();
+        });
+
+        send("streamlit:componentReady", { apiVersion: 1 });
+        setHeight();
+    </script>
+</body>
+</html>
