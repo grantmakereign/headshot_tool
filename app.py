@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
 from PIL import Image
@@ -12,7 +13,7 @@ st.markdown("""
 <style>
     .block-container { padding: 1.5rem 1rem; max-width: 480px; }
     .stButton > button { width: 100%; height: 3.2rem; font-size: 1.1rem; border-radius: 12px; }
-    .stCameraInput > div { border-radius: 12px; }
+    .stFileUploader [data-testid="stFileUploaderDropzone"] { border-radius: 12px; min-height: 110px; }
     h1 { font-size: 1.6rem !important; }
     .step-label { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; color: #aaa; }
     [data-testid="stSidebar"] { display: none; }
@@ -20,6 +21,27 @@ st.markdown("""
     footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
+
+# --- HIGH-RES CAMERA PATCH ---
+# Injects capture="user" onto every file input so mobile browsers open the
+# native camera app at full sensor resolution instead of the WebRTC stream.
+components.html("""
+<script>
+(function() {
+    function patchInputs() {
+        var inputs = window.parent.document.querySelectorAll('input[type="file"]');
+        inputs.forEach(function(el) {
+            el.setAttribute('capture', 'user');
+            el.setAttribute('accept', 'image/*');
+        });
+    }
+    patchInputs();
+    new MutationObserver(patchInputs).observe(
+        window.parent.document.body, { childList: true, subtree: true }
+    );
+})();
+</script>
+""", height=0)
 
 # --- STATIC PROMPTS ---
 NODE_01_HEADER = "Photorealistic, high-resolution, vertical, editorial head-and-chest portrait. Maintain accurate and realistic skin texture."
@@ -114,19 +136,19 @@ if "GOOGLE_API_KEY" not in st.secrets:
 api_key = st.secrets["GOOGLE_API_KEY"]
 
 # Sequential selfie capture
-st.markdown('<div class="step-label">Selfie 1 of 3</div>', unsafe_allow_html=True)
-photo1 = st.camera_input("Take selfie 1", label_visibility="collapsed")
+st.markdown('<div class="step-label">📷 Selfie 1 of 3</div>', unsafe_allow_html=True)
+photo1 = st.file_uploader("Take selfie 1", type=["jpg", "jpeg", "png", "webp"], key="photo1", label_visibility="collapsed")
 
 photo2 = None
 photo3 = None
 
 if photo1:
-    st.markdown('<div class="step-label">Selfie 2 of 3</div>', unsafe_allow_html=True)
-    photo2 = st.camera_input("Take selfie 2", label_visibility="collapsed")
+    st.markdown('<div class="step-label">📷 Selfie 2 of 3</div>', unsafe_allow_html=True)
+    photo2 = st.file_uploader("Take selfie 2", type=["jpg", "jpeg", "png", "webp"], key="photo2", label_visibility="collapsed")
 
 if photo2:
-    st.markdown('<div class="step-label">Selfie 3 of 3</div>', unsafe_allow_html=True)
-    photo3 = st.camera_input("Take selfie 3", label_visibility="collapsed")
+    st.markdown('<div class="step-label">📷 Selfie 3 of 3</div>', unsafe_allow_html=True)
+    photo3 = st.file_uploader("Take selfie 3", type=["jpg", "jpeg", "png", "webp"], key="photo3", label_visibility="collapsed")
 
 if photo1 and photo2 and photo3:
     loaded_images = [Image.open(p) for p in [photo1, photo2, photo3]]
